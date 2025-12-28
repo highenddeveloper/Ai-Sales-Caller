@@ -1,53 +1,76 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Lenis from "lenis";
 import AllRoute from "../router";
-import ErrorBoundary from "./ErrorBoundary";
+import ErrorBoundaryWrapper from "./ErrorBoundaryWrapper";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "animate.css";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SplitText } from "gsap/SplitText";
+import AnimationManager from "../../utils/animationCleanup";
 
 gsap.registerPlugin(SplitText, ScrollTrigger);
 
 const App: React.FC = () => {
-  // ======================
-  // 🌀 Lenis Smooth Scroll
-  // ======================
+  const lenisRef = useRef<Lenis | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const observerRef = useRef<MutationObserver | null>(null);
+  const splitInstancesRef = useRef<Map<string, any>>(new Map());
+
+  // Lenis Smooth Scroll
   useEffect(() => {
-    const lenis = new Lenis({
-      duration: 1.2,
-      smoothWheel: true,
-    });
+    if (lenisRef.current) {
+      console.debug('[Lenis] Instance already initialized');
+      return;
+    }
 
-    let animationFrame: number;
+    try {
+      const lenis = new Lenis({
+        duration: 1.2,
+        smoothWheel: true,
+      });
 
-    const raf = (time: number) => {
-      lenis.raf(time);
-      animationFrame = requestAnimationFrame(raf);
-    };
+      lenisRef.current = lenis;
 
-    requestAnimationFrame(raf);
+      const raf = (time: number) => {
+        if (lenisRef.current) {
+          lenisRef.current.raf(time);
+          animationFrameRef.current = requestAnimationFrame(raf);
+        }
+      };
 
-    // ✅ Cleanup
-    return () => {
-      cancelAnimationFrame(animationFrame);
-      lenis.destroy();
-    };
+      animationFrameRef.current = requestAnimationFrame(raf);
+
+      console.debug('[Lenis] Initialization complete');
+
+      return () => {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+        if (lenisRef.current) {
+          lenisRef.current.destroy();
+          lenisRef.current = null;
+        }
+        console.debug('[Lenis] Cleanup complete');
+      };
+    } catch (error) {
+      console.error('[Lenis] Initialization failed:', error);
+    }
   }, []);
 
-  // ======================
   // SplitText Reveal Animation
-  // ======================
   useEffect(() => {
     const applySplitTextReveal = () => {
       const elements = document.querySelectorAll<HTMLElement>(".xb-text-reveal");
       if (!elements.length) return;
 
-      elements.forEach((el) => {
+      elements.forEach((el, index) => {
         if (el.dataset.splitApplied === "true") return;
+
+        const splitId = `split-${index}-${Date.now()}`;
         el.dataset.splitApplied = "true";
+        el.dataset.splitId = splitId;
 
         try {
           const split = new SplitText(el, {
@@ -55,9 +78,12 @@ const App: React.FC = () => {
             linesClass: "split-line",
           });
 
+          splitInstancesRef.current.set(splitId, split);
+          AnimationManager.registerSplitInstance(splitId, split);
+
           gsap.set(split.chars, { opacity: 0.3, x: -7 });
 
-          gsap.to(split.chars, {
+          const tween = gsap.to(split.chars, {
             scrollTrigger: {
               trigger: el,
               start: "top 92%",
@@ -71,39 +97,85 @@ const App: React.FC = () => {
             stagger: 0.2,
             ease: "power2.out",
           });
+
+          AnimationManager.trackTween(tween);
+
+          console.debug(`[Animation] SplitText applied to ${splitId}`);
         } catch (error) {
-          console.warn("SplitText failed:", error);
+          console.warn("[Animation] SplitText failed:", error);
         }
       });
     };
 
-    // Run after DOM has settled
     const timeout = setTimeout(applySplitTextReveal, 400);
 
-    // ✅ Observe DOM changes for SPA route updates
-    const observer = new MutationObserver(() => {
+    observerRef.current = new MutationObserver(() => {
       requestAnimationFrame(applySplitTextReveal);
     });
 
-    observer.observe(document.body, { childList: true, subtree: true });
+    observerRef.current.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: false,
+    });
 
-    // ✅ Cleanup
+    console.debug('[Animation] Observer started');
+
     return () => {
       clearTimeout(timeout);
-      observer.disconnect();
-      ScrollTrigger.getAll().forEach((st) => st.kill());
+
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
+
+      ScrollTrigger.getAll().forEach((st) => {
+        try {
+          st.kill();
+        } catch (error) {
+          console.warn('[ScrollTrigger] Kill error:', error);
+        }
+      });
+
+      try {
+        gsap.killTweensOf('.xb-text-reveal *');
+      } catch (error) {
+        console.warn('[GSAP] killTweensOf error:', error);
+      }
+
+      splitInstancesRef.current.forEach((instance, id) => {
+        try {
+          if (instance && typeof instance.revert === 'function') {
+            instance.revert();
+          }
+        } catch (error) {
+          console.warn(`[SplitText] Revert error for ${id}:`, error);
+        }
+      });
+      splitInstancesRef.current.clear();
+
+      AnimationManager.reset();
+
+      console.debug('[Animation] Cleanup complete');
     };
   }, []);
 
-  // ======================
-  // Render
-  // ======================
   return (
     <div className="App lenis" id="scrool">
-      <ErrorBoundary>
+      <ErrorBoundaryWrapper>
         <AllRoute />
-      </ErrorBoundary>
-      <ToastContainer position="top-right" autoClose={3000} />
+      </ErrorBoundaryWrapper>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
     </div>
   );
 };

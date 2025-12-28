@@ -1,169 +1,159 @@
 import React, { Component, ReactNode } from "react";
 import { Link } from "react-router-dom";
+import ErrorService from "../../utils/errorService";
 
 interface ErrorBoundaryProps {
     children: ReactNode;
+    onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
 }
 
 interface ErrorBoundaryState {
     hasError: boolean;
+    errorMessage: string;
+    errorDetails: string;
 }
 
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     constructor(props: ErrorBoundaryProps) {
         super(props);
-        this.state = { hasError: false };
+        this.state = {
+            hasError: false,
+            errorMessage: "",
+            errorDetails: "",
+        };
     }
 
-    static getDerivedStateFromError(): ErrorBoundaryState {
-        return { hasError: true };
+    static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+        return {
+            hasError: true,
+            errorMessage: error.message || "An unexpected error occurred",
+            errorDetails: error.toString(),
+        };
     }
 
-    componentDidCatch(error: Error, info: React.ErrorInfo) {
-        console.error("Uncaught error:", error, info);
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+        console.error("[ErrorBoundary] Caught error:", error);
+        console.error("[ErrorBoundary] Error info:", errorInfo);
+
+        ErrorService.logError(
+            error.message,
+            error.stack,
+            errorInfo.componentStack
+        );
+
+        if (this.props.onError) {
+            this.props.onError(error, errorInfo);
+        }
     }
+
+    handleReset = () => {
+        this.setState({
+            hasError: false,
+            errorMessage: "",
+            errorDetails: "",
+        });
+    };
+
+    handleRefresh = () => {
+        window.location.reload();
+    };
 
     render() {
         if (this.state.hasError) {
             return (
-                <div className="error-boundary text-center p-5">
-                    <h2>Something went wrong 😢</h2>
-                    <p>Try refreshing the page or go back to home.</p>
-                    <Link className="thm-btn agency-btn" to="/">
-                        <span className="text">Back to Home</span>
-                        <span className="arrow">
-                            <span className="arrow-icon">
-                                <svg
-                                    width="28"
-                                    height="28"
-                                    viewBox="0 0 28 28"
-                                    fill="none"
-                                    xmlns="http://www.w3.org/2000/svg"
+                <div
+                    className="error-boundary"
+                    style={{
+                        minHeight: "100vh",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        padding: "40px 20px",
+                        textAlign: "center",
+                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        color: "white",
+                    }}
+                >
+                    <div style={{ maxWidth: "600px" }}>
+                        <h1 style={{ fontSize: "3rem", marginBottom: "20px" }}>
+                            😢 Something Went Wrong
+                        </h1>
+
+                        <p style={{ fontSize: "1.2rem", marginBottom: "30px" }}>
+                            We encountered an unexpected error. Our team has been notified.
+                        </p>
+
+                        {import.meta.env.DEV && (
+                            <details
+                                style={{
+                                    marginBottom: "30px",
+                                    textAlign: "left",
+                                    background: "rgba(255, 255, 255, 0.1)",
+                                    padding: "15px",
+                                    borderRadius: "8px",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                <summary style={{ cursor: "pointer", marginBottom: "10px" }}>
+                                    Error Details (Development Only)
+                                </summary>
+                                <pre
+                                    style={{
+                                        overflow: "auto",
+                                        maxHeight: "200px",
+                                        fontSize: "0.9rem",
+                                    }}
                                 >
-                                    <rect
-                                        x="5.06592"
-                                        y="19.9785"
-                                        width="20.5712"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 5.06592 19.9785)"
-                                        fill="white"
-                                    />
-                                    <rect
-                                        x="7.97095"
-                                        y="7.24463"
-                                        width="2.61221"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 7.97095 7.24463)"
-                                        fill="white"
-                                    />
-                                    <rect
-                                        x="11.6523"
-                                        y="7.54834"
-                                        width="2.61221"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 11.6523 7.54834)"
-                                        fill="white"
-                                    />
-                                    <rect
-                                        x="15.334"
-                                        y="7.85205"
-                                        width="2.61221"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 15.334 7.85205)"
-                                        fill="white"
-                                    />
-                                    <rect
-                                        x="18.7119"
-                                        y="11.8374"
-                                        width="2.61221"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 18.7119 11.8374)"
-                                        fill="white"
-                                    />
-                                    <rect
-                                        x="18.4084"
-                                        y="15.52"
-                                        width="2.61221"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 18.4084 15.52)"
-                                        fill="white"
-                                    />
-                                    <rect
-                                        x="18.104"
-                                        y="19.2012"
-                                        width="2.61221"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 18.104 19.2012)"
-                                        fill="white"
-                                    />
-                                </svg>
-                                <svg
-                                    width="28"
-                                    height="28"
-                                    viewBox="0 0 28 28"
-                                    fill="none"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                >
-                                    <rect
-                                        x="5.06592"
-                                        y="19.9785"
-                                        width="20.5712"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 5.06592 19.9785)"
-                                        fill="white"
-                                    />
-                                    <rect
-                                        x="7.97095"
-                                        y="7.24463"
-                                        width="2.61221"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 7.97095 7.24463)"
-                                        fill="white"
-                                    />
-                                    <rect
-                                        x="11.6523"
-                                        y="7.54834"
-                                        width="2.61221"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 11.6523 7.54834)"
-                                        fill="white"
-                                    />
-                                    <rect
-                                        x="15.334"
-                                        y="7.85205"
-                                        width="2.61221"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 15.334 7.85205)"
-                                        fill="white"
-                                    />
-                                    <rect
-                                        x="18.7119"
-                                        y="11.8374"
-                                        width="2.61221"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 18.7119 11.8374)"
-                                        fill="white"
-                                    />
-                                    <rect
-                                        x="18.4084"
-                                        y="15.52"
-                                        width="2.61221"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 18.4084 15.52)"
-                                        fill="white"
-                                    />
-                                    <rect
-                                        x="18.104"
-                                        y="19.2012"
-                                        width="2.61221"
-                                        height="2.61221"
-                                        transform="rotate(-40.2798 18.104 19.2012)"
-                                        fill="white"
-                                    />
-                                </svg>
-                            </span>
-                        </span>
-                    </Link>
+                                    <strong>Message:</strong> {this.state.errorMessage}
+                                    {"\n\n"}
+                                    <strong>Details:</strong> {this.state.errorDetails}
+                                </pre>
+                            </details>
+                        )}
+
+                        <div
+                            style={{
+                                display: "flex",
+                                gap: "15px",
+                                justifyContent: "center",
+                                flexWrap: "wrap",
+                            }}
+                        >
+                            <button
+                                onClick={this.handleRefresh}
+                                style={{
+                                    padding: "12px 30px",
+                                    fontSize: "1rem",
+                                    background: "white",
+                                    color: "#667eea",
+                                    border: "none",
+                                    borderRadius: "25px",
+                                    cursor: "pointer",
+                                    fontWeight: "bold",
+                                }}
+                            >
+                                🔄 Refresh Page
+                            </button>
+
+                            <Link
+                                to="/"
+                                style={{
+                                    padding: "12px 30px",
+                                    fontSize: "1rem",
+                                    background: "rgba(255, 255, 255, 0.2)",
+                                    color: "white",
+                                    border: "2px solid white",
+                                    borderRadius: "25px",
+                                    textDecoration: "none",
+                                    display: "inline-block",
+                                    fontWeight: "bold",
+                                }}
+                            >
+                                🏠 Go to Home
+                            </Link>
+                        </div>
+                    </div>
                 </div>
             );
         }
